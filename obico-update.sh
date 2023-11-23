@@ -1,6 +1,10 @@
 #/usr/bin/bash
-### Variables to edit if needed (Defaults should be fine) ###
-OBICO=~/obico-server
+set -e
+
+export OBICO_DIR=$(readlink -f $(dirname "$0"))
+
+#OBICO=~/obico-server
+OBICO=${OBICO}
 BACKUP_DIR=backup
 
 ##### Do not edit unless you know what you are doing #####
