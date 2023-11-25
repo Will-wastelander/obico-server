@@ -4,7 +4,7 @@ set -e
 export OBICO_DIR=$(readlink -f $(dirname "$0"))
 
 #OBICO=~/obico-server
-OBICO=${OBICO}
+OBICO=${OBICO_DIR}
 BACKUP_DIR=backup
 
 ##### Do not edit unless you know what you are doing #####
