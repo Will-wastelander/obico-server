@@ -149,6 +149,7 @@ class Printer(SafeDeleteModel):
         (NONE, 'Just notify me'),
         (PAUSE, 'Pause the printer and notify me'),
     )
+    DEFAULT_WEBCAM_SETTINGS = {'flipV': False, 'flipH': False, 'rotation': 0, 'streamRatio': '16:9'}
 
     name = models.CharField(max_length=256, null=False)
     auth_token = models.CharField(max_length=256, unique=True, null=False, blank=False)
@@ -191,9 +192,17 @@ class Printer(SafeDeleteModel):
     def settings(self):
         p_settings = cache.printer_settings_get(self.id)
 
-        for key in ('webcam_flipV', 'webcam_flipH', 'webcam_rotate90'):
+        for key in ('webcam_flipV', 'webcam_flipH', 'webcam_rotate90'): # `webcam_rotate90` for backward compatibility with old plugins
             p_settings[key] = p_settings.get(key, 'False') == 'True'
-        p_settings['ratio169'] = p_settings.get('webcam_streamRatio', '4:3') == '16:9'
+
+        if 'webcam_rotation' in p_settings:
+            rotation_int = int(p_settings['webcam_rotation'])
+            p_settings['webcam_rotation'] = rotation_int if rotation_int in [0, 90, 180, 270] else 0
+            p_settings['webcam_rotate90'] = rotation_int == 270 # backward compatibility with old mobile app
+        elif 'webcam_rotate90' in p_settings: # Backward compatibility with old plugins
+            p_settings['webcam_rotation'] = int(270 if p_settings['webcam_rotate90'] else 0)
+
+        p_settings['ratio169'] = p_settings.get('webcam_streamRatio', '16:9') == '16:9'
 
         if p_settings.get('temp_profiles'):
             p_settings['temp_profiles'] = json.loads(p_settings.get('temp_profiles'))
@@ -326,7 +335,6 @@ class Printer(SafeDeleteModel):
     def pause_print(self, initiator=None):
         if self.current_print is None:
             return False
-        self.current_print.paused() # Hack: print.paused_at is used to prevent pausing multiple times in case of detected failure. Set it right away to prevent it.
 
         args = {'retract': self.retract_on_pause, 'lift_z': self.lift_z_on_pause}
 
@@ -473,7 +481,7 @@ class Print(SafeDeleteModel):
     user = models.ForeignKey(User, on_delete=models.CASCADE, null=False)
     ext_id = models.IntegerField(null=True, blank=True)
     filename = models.CharField(max_length=1000, null=False, blank=False)
-    started_at = models.DateTimeField(null=True)
+    started_at = models.DateTimeField(null=True, db_index=True)
     finished_at = models.DateTimeField(null=True)
     cancelled_at = models.DateTimeField(null=True)
     uploaded_at = models.DateTimeField(null=True)
@@ -492,22 +500,15 @@ class Print(SafeDeleteModel):
     )
     access_consented_at = models.DateTimeField(null=True, blank=True)
     video_archived_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    filament_used = models.FloatField(null=True)
+    print_time = models.FloatField(null=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-
-    def paused(self):
-        self.paused_at = timezone.now()
-        self.save()
-
-    def resumed(self):
-        self.paused_at = None
-        self.save()
-        self.alert_acknowledged(Print.NOT_FAILED)
 
     def cancelled(self):
         self.cancelled_at = timezone.now()
         self.save()
-        self.alert_acknowledged(Print.FAILED)
 
     def alert_acknowledged(self, alert_overwrite):
         if not self.alerted_at:   # Not even alerted. Shouldn't be here. Maybe user error?
@@ -528,6 +529,12 @@ class Print(SafeDeleteModel):
 
     def is_canceled(self):
         return bool(self.cancelled_at)
+
+    def need_alert_overwrite(self):
+        return self.alert_overwrite is None and self.tagged_video_url is not None
+
+    def need_print_shot_feedback(self):
+        return self.printshotfeedback_set.filter(answered_at__isnull=True).count() > 0
 
     @property
     def expecting_detective_view(self):
@@ -691,7 +698,7 @@ class GCodeFolder(models.Model):
         return self.gcodefile_set.count()
 
 
-class GCodeFile(models.Model):
+class GCodeFile(SafeDeleteModel):
     class Meta:
         indexes = [
             models.Index(fields=['agent_signature'])
@@ -714,6 +721,12 @@ class GCodeFile(models.Model):
     resident_printer = models.ForeignKey(Printer, on_delete=models.CASCADE, null=True)  # null for gcode files on the server
     # A value the agent can independently derive to match with the server. Format: scheme:value
     agent_signature = models.CharField(max_length=256, null=True, blank=False)
+    metadata_json = models.TextField(null=True, blank=False)
+    filament_total = models.FloatField(null=True)
+    estimated_time = models.FloatField(null=True)
+    thumbnail1_url = models.CharField(max_length=2000, null=True, blank=False)
+    thumbnail2_url = models.CharField(max_length=2000, null=True, blank=False)
+    thumbnail3_url = models.CharField(max_length=2000, null=True, blank=False)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -865,8 +878,6 @@ class OctoPrintTunnel(SafeDeleteModel):
     def create(
         cls, printer: Printer, app: str
     ) -> 'OctoPrintTunnel':
-        # Some users will create multiple tunnels for the same 3rd-party apps for various reasons. Delete existing once so that it won't be confusing for them.
-        cls.objects.filter(printer=printer, app=app).delete()
 
         internal = app == cls.INTERNAL_APP
         if internal:

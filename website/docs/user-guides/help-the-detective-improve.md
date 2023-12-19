@@ -14,7 +14,7 @@ For instance, if The Detective claims that she has found spaghetti for a print, 
 
 ## Upload your own time-lapse videos {#upload-your-own-time-lapse-videos}
 
-The more The Detective sees, the better she gets. That's why it'll help her tremendously if you upload time-lapse videos for her to look at. For instance, there are probably a lot of time-lapse videos sitting in your OctoPrint's Timelpase folder - upload them all!
+The more The Detective sees, the better she gets. That's why it'll help her tremendously if you upload time-lapse videos for her to look at. For instance, there are probably a lot of time-lapse videos sitting in your OctoPrint's Timelapse folder - upload them all!
 
 To upload your own time-lapse videos, go to the [TIME-LAPSE](https://app.obico.io/prints/) page and click on the button with an upload icon.
 
@@ -30,6 +30,6 @@ Once you are on the upload page, drop as many time-lapse video files as you want
 
 No. The time The Detective spends on looking at your uploaded time-lapse videos is completely on the house. :)
 
-#### I am running my own private TSD server. Do the time-lapse videos on my server get uploaded to TSD cloud automatically? {#i-am-running-my-own-private-tsd-server-do-the-time-lapse-videos-on-my-server-get-uploaded-to-tsd-cloud-automatically}
+#### I am running my own private Obico server. Do the time-lapse videos on my server get uploaded to Obico cloud automatically? {#i-am-running-my-own-private-tsd-server-do-the-time-lapse-videos-on-my-server-get-uploaded-to-tsd-cloud-automatically}
 
-No! We understand that nobody wants to get their videos uploaded without a proper consent. The time-lapse videos will safely stay in your private server. Of course, if you want to get back to TSD community by uploading these videos, you are always welcome!
+No! We understand that nobody wants to get their videos uploaded without a proper consent. The time-lapse videos will safely stay in your private server. Of course, if you want to get back to Obico community by uploading these videos, you are always welcome!

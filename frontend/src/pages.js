@@ -6,6 +6,7 @@ import NewOctoPrintTunnelPage from '@src/views/NewOctoPrintTunnelPage.vue'
 import OctoPrintTunnelPage from '@src/views/OctoPrintTunnelPage.vue'
 import PrintShotFeedbackApp from '@src/views/PrintShotFeedbackApp.vue'
 import PrintHistoryPage from '@src/views/PrintHistoryPage.vue'
+import StatsPage from '@src/views/StatsPage.vue'
 import PrintsPage from '@src/views/PrintsPage.vue'
 import PrintPage from '@src/views/PrintPage.vue'
 import UploadPrintPage from '@src/views/UploadPrintPage.vue'
@@ -18,6 +19,7 @@ import GCodeFoldersPage from '@src/views/GCodeFoldersPage.vue'
 import GCodeFilePage from '@src/views/GCodeFilePage.vue'
 import UserPreferencesPage from '@src/views/UserPreferencesPage.vue'
 import PrinterEventsPage from '@src/views/PrinterEventsPage.vue'
+import PrinterTerminalPage from '@src/views/PrinterTerminalPage.vue'
 
 const router = new VueRouter({
   mode: 'history',
@@ -68,9 +70,11 @@ const components = {
   PrintsPage,
   PrintPage,
   PrintHistoryPage,
+  StatsPage,
   UploadPrintPage,
   UserPreferencesPage,
   PrinterEventsPage,
+  PrinterTerminalPage,
 }
 
 export { router, components }

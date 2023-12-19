@@ -11,7 +11,7 @@ from app.models import PrinterEvent, Printer
 from lib.heater_trackers import process_heater_temps
 
 LOGGER = logging.getLogger(__name__)
-STATUS_TTL_SECONDS = 240
+STATUS_TTL_SECONDS = 120
 
 def process_octoprint_status(printer: Printer, msg: Dict) -> None:
     # Backward compatibility: octoprint_settings is for OctoPrint-Obico 2.1.2 or earlier, or moonraker-obico 0.5.1 or earlier
@@ -34,7 +34,7 @@ def process_octoprint_status(printer: Printer, msg: Dict) -> None:
         cache.printer_status_delete(printer.id)
     elif (printer_status or {}).get('_ts'):   # data format for plugin 1.6.0 and higher
         cache.printer_status_set(printer.id, json.dumps((printer_status or {})), ex=STATUS_TTL_SECONDS)
-    else:
+    else: # TODO: retire this part after 7/1/2023
         octoprint_data: Dict = dict()
         set_as_str_if_present(octoprint_data, (printer_status or {}), 'state')
         set_as_str_if_present(octoprint_data, (printer_status or {}), 'progress')
@@ -54,7 +54,11 @@ def process_octoprint_status(printer: Printer, msg: Dict) -> None:
 
 
 def settings_dict(octoprint_settings):
-    settings = dict(('webcam_' + k, str(v)) for k, v in octoprint_settings.get('webcam', {}).items())
+    webcam_settings = dict(Printer.DEFAULT_WEBCAM_SETTINGS)
+
+    webcam_settings.update(octoprint_settings.get('webcam', {}))
+    settings = dict(('webcam_' + k, str(v)) for k, v in webcam_settings.items())
+
     settings.update(dict(temp_profiles=json.dumps(octoprint_settings.get('temperature', {}).get('profiles', []))))
     settings.update(dict(printer_metadata=json.dumps(octoprint_settings.get('printer_metadata', {}))))
     settings.update(
@@ -62,6 +66,7 @@ def settings_dict(octoprint_settings):
         octoprint_version=octoprint_settings.get('octoprint_version', ''),
     )
     settings.update(dict(platform_uname=json.dumps(octoprint_settings.get('platform_uname', []))))
+    settings.update(dict(installed_plugins=json.dumps(octoprint_settings.get('installed_plugins', []))))
 
     return settings
 
@@ -85,9 +90,13 @@ def update_current_print_if_needed(msg, printer):
 
     # Notification for mobile devices
     # This has to happen before event saving, as `current_print` may change after event saving.
-    mobile_notifications.send_if_needed(printer.current_print, op_event, printer_status)
+    mobile_notifications.send_print_progress(printer.current_print, printer_status)
 
+    if op_event.get('event_type') == 'PrintCancelling':
+        # progress data will be reset after PrintCancelling in OctoPrint. Set it now or never.
+        update_print_stats_if_needed(printer_status, printer.current_print)
     if op_event.get('event_type') == 'PrintCancelled':
+        update_print_stats_if_needed(printer_status, printer.current_print)
         printer.current_print.cancelled()
     elif op_event.get('event_type') == 'PrintFailed':
         # setting cancelled_at here, original commit:
@@ -95,12 +104,49 @@ def update_current_print_if_needed(msg, printer):
         printer.current_print.cancelled()
         printer.unset_current_print()
     elif op_event.get('event_type') == 'PrintDone':
+        update_print_stats_if_needed(printer_status, printer.current_print)
         printer.unset_current_print()
     elif op_event.get('event_type') == 'PrintPaused':
-        printer.current_print.paused()
         PrinterEvent.create(print=printer.current_print, event_type=PrinterEvent.PAUSED, task_handler=True)
     elif op_event.get('event_type') == 'PrintResumed':
-        printer.current_print.resumed()
         PrinterEvent.create(print=printer.current_print, event_type=PrinterEvent.RESUMED, task_handler=True)
     elif op_event.get('event_type') == 'FilamentChange':
         PrinterEvent.create(print=printer.current_print, event_type=PrinterEvent.FILAMENT_CHANGE, task_handler=True)
+
+def update_print_stats_if_needed(printer_status, _print):
+    '''
+    This method is idempotent and set the stats at the first chance.
+    This is because various versions of OctoPrint-Obico and moonraker-obico
+    are not consistent at when the relevant values will be reset.
+    For instance, the earliest and the latest events for OctoPrint-Obico are:
+    PrintDone, PrintCancelling.
+    For moonraker-obico, it's Cancelled, Done, but not with a wrong completion value
+    '''
+    print_obj_dirty = False
+
+    if _print.print_time is None:
+
+        print_time = printer_status.get('progress', {}).get('printTime')
+        if print_time is not None:
+            _print.print_time = print_time
+        else:
+            _print.print_time = (timezone.now() - _print.started_at).total_seconds()
+
+        print_obj_dirty = True
+
+    if _print.filament_used is None:
+
+        completion = printer_status.get('progress', {}).get('completion')
+        filament_used = printer_status.get('progress', {}).get('filamentUsed')
+
+        if filament_used is None and completion is not None and _print.g_code_file and _print.g_code_file.filament_total:
+            if completion == 0 and print_time and _print.g_code_file.estimated_time: # Old moonraker-obico version sends completion: 0.0 when print ends. We estimate it using print time
+                completion = print_time / _print.g_code_file.estimated_time
+            filament_used = _print.g_code_file.filament_total * completion / 100.0
+
+        if filament_used is not None:
+            _print.filament_used = filament_used
+            print_obj_dirty = True
+
+    if print_obj_dirty:
+        _print.save()

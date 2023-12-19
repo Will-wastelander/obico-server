@@ -1,7 +1,7 @@
 <template>
   <page-layout>
     <template #content>
-      <b-container>
+      <b-container class="feedback-container">
         <b-row class="justify-content-center">
           <b-col lg="8">
             <div class="card">
@@ -20,7 +20,7 @@
                   <div>
                     <vue-slick-carousel
                       ref="carousel"
-                      :arrows="true"
+                      :arrows="false"
                       :dots="true"
                       @afterChange="onNextShot"
                     >
@@ -29,21 +29,20 @@
                         :key="i"
                         :shot="shot"
                         @shotChanged="onShotChanged"
+                        @prev="onPrev"
+                        @next="onNext"
                       ></print-shot-card>
                       <template #customPaging="page">
                         <div :class="pageClass(page)">&bull;</div>
                       </template>
                     </vue-slick-carousel>
                   </div>
-                  <!-- FIXME: -->
-                  <!-- Commented this for now because this page temporary available both from legacy
-                  Time-Lapses page and new Print Page (not sure how Back should work here) -->
-                  <!-- <br />
+                  <br />
                   <div class="card-body p-3">
                     <a :href="`/print_history/${print.id}/`">
                       <i class="fas fa-chevron-left"></i> Print Page
                     </a>
-                  </div> -->
+                  </div>
                 </div>
               </div>
             </div>
@@ -129,6 +128,14 @@ export default {
       this.currentShot = shotIndex
     },
 
+    onPrev() {
+      this.$refs.carousel.prev()
+    },
+
+    onNext() {
+      this.$refs.carousel.next()
+    },
+
     pageClass(page) {
       if (page === this.currentShot) {
         return 'page-visiting'
@@ -159,4 +166,8 @@ export default {
 
 .page-unvisited
   color: var(--color-divider)
+
+.feedback-container
+  padding-left: 30px
+  padding-right: 30px
 </style>

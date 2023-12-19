@@ -111,8 +111,13 @@ function MJpegtWebRTCConnection() {
                   if (stream) {
                     self.streamId = stream.id
                     self.streaming = pluginHandle
-                    if (get(stream, 'media[0].type') === 'data') {
-                      self.callbacks.onStreamAvailable()
+
+                    const mjpegStreamExisting =
+                      get(stream, 'data') || // Janus 0.x format
+                      find(get(stream, 'media', []), { type: 'data' }) // Janus 1.x format
+
+                    if (mjpegStreamExisting) {
+                      self.callbacks.onStreamAvailable(self)
                     }
                   } else {
                     janus.destroy()
@@ -254,7 +259,7 @@ function MainWebRTCConnection() {
                         find(get(stream, 'media', []), { type: 'video' }) // Janus 1.x format
 
                       if (videoStreamExisting) {
-                        self.callbacks.onStreamAvailable()
+                        self.callbacks.onStreamAvailable(self)
                       }
                     }
                   },

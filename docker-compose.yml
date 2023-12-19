@@ -37,6 +37,7 @@ x-web-defaults: &web-defaults
     PUSHOVER_APP_TOKEN: '${PUSHOVER_APP_TOKEN-}'
     SLACK_CLIENT_ID: '${SLACK_CLIENT_ID-}'
     SLACK_CLIENT_SECRET: '${SLACK_CLIENT_SECRET-}'
+    DJANGO_SECRET_KEY: '${DJANGO_SECRET_KEY-}'
     VERSION:
 
 services:
@@ -46,10 +47,10 @@ services:
     build:
       context: ml_api
     environment:
-        DEBUG: 'True'
-        FLASK_APP: 'server.py'
-        #ML_API_TOKEN:
-        #HAS_GPU: 'False'
+      DEBUG: 'True'
+      FLASK_APP: 'server.py'
+      # ML_API_TOKEN:
+    tty: true
     command: bash -c "gunicorn --bind 0.0.0.0:3333 --workers 1 wsgi"
 
   web:

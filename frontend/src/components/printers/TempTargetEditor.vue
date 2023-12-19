@@ -12,10 +12,15 @@
         <h5>Presets:</h5>
       </div>
       <div>
-        <b-form-select id="id_preset" v-model="preset" @change="onPresetChanged">
+        <b-form-select
+          id="id_preset"
+          v-model="preset"
+          class="form-control"
+          @change="onPresetChanged"
+        >
           <b-form-select-option
             v-for="pre in allPresets"
-            :key="pre.value"
+            :key="pre.name"
             :value="parseInt(pre.value)"
           >
             {{ pre.title }}
@@ -25,14 +30,13 @@
       <br />
       <h5>Manual:</h5>
       <div>
-        <vue-slider
+        <slider-input
           v-model="value"
           :min="0"
           :max="maxTemp"
           :step="1"
-          :tooltip="'none'"
           @change="onSliderChanged"
-        ></vue-slider>
+        ></slider-input>
         <input id="target-temp" v-model="value" type="hidden" />
       </div>
     </div>
@@ -40,12 +44,12 @@
 </template>
 
 <script>
-import VueSlider from 'vue-slider-component'
+import SliderInput from '@src/components/SliderInput.vue'
 
 export default {
   name: 'TempTargetEditor',
   components: {
-    VueSlider,
+    SliderInput,
   },
   props: {
     presets: {
@@ -70,11 +74,15 @@ export default {
   computed: {
     allPresets() {
       let presets = []
-      presets.push({ value: -1, title: 'Manual' })
-      presets.push({ value: 0, title: 'OFF' })
+      presets.push({ value: -1, title: 'Manual', name: 'manual' })
+      presets.push({ value: 0, title: 'OFF', name: 'off' })
       this.presets.forEach((pre) => {
         if (pre.target) {
-          presets.push({ value: pre.target, title: `${pre.name} (${pre.target}°C)` })
+          presets.push({
+            value: pre.target,
+            name: pre.name,
+            title: `${pre.name} (${pre.target}°C)`,
+          })
         }
       })
       return presets

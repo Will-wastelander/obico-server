@@ -2,6 +2,12 @@ import moment from 'moment'
 import get from 'lodash/get'
 import filesize from 'filesize'
 import semverGte from 'semver/functions/gte'
+import { humanizedDuration } from '@src/lib/formatters'
+import { gcodeMetadata } from '@src/components/g-codes/gcode-metadata'
+import {
+  setPrinterTransientState,
+  getPrinterCalculatedState,
+} from '@src/lib/printer-transient-state'
 
 export const toMomentOrNull = (datetimeStr) => {
   if (!datetimeStr) {
@@ -11,9 +17,10 @@ export const toMomentOrNull = (datetimeStr) => {
 }
 
 export const PrintStatus = {
-  Printing: { key: 'printing', title: 'Printing...' },
-  Finished: { key: 'finished', title: 'Finished' },
-  Cancelled: { key: 'cancelled', title: 'Cancelled' },
+  Printing: { key: 'printing', title: 'Printing...', isActive: true },
+  Paused: { key: 'paused', title: 'Paused', isActive: true },
+  Finished: { key: 'finished', title: 'Finished', isActive: false },
+  Cancelled: { key: 'cancelled', title: 'Cancelled', isActive: false },
 }
 
 // ––––––––––––––––––––––
@@ -26,18 +33,17 @@ export const normalizedPrint = (print) => {
   print.ended_at = toMomentOrNull(print.ended_at)
   if (print.ended_at) {
     const duration = moment.duration(print.ended_at.diff(print.started_at))
-    print.duration = duration.hours() ? `${duration.hours()}h ` : ''
-    print.duration += `${duration.minutes()}m`
+    print.duration = humanizedDuration(duration.asSeconds())
   }
   print.has_alerts = Boolean(print.alerted_at)
-  print.reviewNeeded = print.alert_overwrite === null && print.tagged_video_url !== null
-  print.focusedFeedbackNeeded =
-    print.printshotfeedback_set &&
-    print.printshotfeedback_set.find((shot) => shot.answered_at === null)
+  print.printShotFeedbackEligible =
+    print.printshotfeedback_set && print.printshotfeedback_set.length > 0
   print.status = print.ended_at
     ? print.cancelled_at
       ? PrintStatus.Cancelled
       : PrintStatus.Finished
+    : print.paused_at
+    ? PrintStatus.Paused
     : PrintStatus.Printing
   if (print.printer) {
     print.printer = normalizedPrinter(print.printer)
@@ -49,6 +55,10 @@ export const normalizedPrint = (print) => {
 }
 
 export const normalizedGcode = (gcode) => {
+  if (!gcode) {
+    return
+  }
+
   gcode.created_at = toMomentOrNull(gcode.created_at)
   gcode.updated_at = toMomentOrNull(gcode.updated_at)
   gcode.deleted = toMomentOrNull(gcode.deleted)
@@ -87,6 +97,52 @@ export const normalizedGcode = (gcode) => {
     gcode.totalPrints = gcode.print_set.length
   }
 
+  // Normalize metadata
+  gcode.metadata = {}
+
+  if (gcode.metadata_json) {
+    // obico file with metadata
+    gcode.metadata = JSON.parse(gcode.metadata_json)
+  } else if (gcode.analysis) {
+    // octoprint file
+    gcode.metadata.object_height = gcode.analysis.dimensions?.height
+    gcode.metadata.estimated_time = gcode.analysis.estimatedPrintTime
+
+    let filament_total
+    if (gcode.analysis.filament) {
+      const tools = Object.keys(gcode.analysis.filament)
+      if (tools.length) {
+        filament_total = 0
+        tools.forEach((key) => {
+          filament_total += gcode.analysis.filament[key].length
+        })
+      }
+    }
+    gcode.metadata.filament_total = filament_total
+  } else {
+    // either obico file without metadata or klipper file
+    gcodeMetadata.forEach((v) => {
+      if (gcode[v.name]) {
+        gcode.metadata[v.name] = gcode[v.name]
+      }
+    })
+  }
+
+  // leave only non-null metadata
+  Object.keys(gcode.metadata).forEach((key) => {
+    if (gcode.metadata[key] === null || gcode.metadata[key] === undefined) {
+      delete gcode.metadata[key]
+    }
+  })
+
+  // Normalize thumbnail
+  gcode.getBigThumbnailUrl = () => {
+    return gcode.thumbnail1_url || gcode.thumbnail2_url || gcode.thumbnail3_url
+  }
+  gcode.getSmallThumbnailUrl = () => {
+    return gcode.thumbnail3_url || gcode.thumbnail2_url || gcode.thumbnail1_url
+  }
+
   return gcode
 }
 
@@ -102,6 +158,9 @@ export const normalizedPrinter = (newData, oldData) => {
     createdAt: function () {
       return toMomentOrNull(this.created_at)
     },
+    progressCompletion: function () {
+      return get(this, 'status.progress.completion', 0)
+    },
     isOffline: function () {
       return get(this, 'status', null) === null
     },
@@ -114,14 +173,43 @@ export const normalizedPrinter = (newData, oldData) => {
     isActive: function () {
       const flags = get(this, 'status.state.flags')
       // https://discord.com/channels/704958479194128507/705047010641838211/1013193281280159875
-      return Boolean(flags && flags.operational && (!flags.ready || flags.paused))
+      return (
+        Boolean(flags && flags.operational && (!flags.ready || flags.paused)) ||
+        this.inTransientState()
+      )
     },
     inTransientState: function () {
-      return (
-        !this.hasError() &&
-        get(this, 'status.state.text', '').includes('ing') &&
-        !get(this, 'status.state.text', '').includes('Printing')
-      )
+      const calculatedState = this.calculatedState()
+      // Backward compatibility with OctoPrint-Obico 2.3.7 - 2.3.9
+      if (calculatedState === 'Downloading G-Code') {
+        return true
+      }
+
+      return calculatedState && calculatedState.endsWith('ing') && calculatedState !== 'Printing'
+    },
+    calculatedState: function () {
+      return getPrinterCalculatedState(this, this.status?.state?.text)
+    },
+    calculatedStateColor: function () {
+      const calcState = this.calculatedState()
+      const colorMapping = {
+        secondary: ['Offline', undefined, null],
+        success: ['Operational'],
+        neutral: ['Printing', 'G-Code Downloading', 'Downloading G-Code', 'Starting'],
+        warning: ['Paused', 'Pausing', 'Resuming'],
+        danger: ['Cancelling'],
+      }
+
+      for (const [color, states] of Object.entries(colorMapping)) {
+        if (states.includes(calcState)) {
+          return color
+        }
+      }
+      return 'neutral' // fallback
+    },
+    setTransientState: function (stateText) {
+      setPrinterTransientState(this, stateText)
+      if (this.status) this.status = { ...this.status } // clone status to trigger immidiate UI update
     },
     inUserInteractionRequired: function () {
       return get(this, 'status.user_interaction_required', false)
@@ -138,12 +226,12 @@ export const normalizedPrinter = (newData, oldData) => {
     agentDisplayName: function () {
       return this.isAgentMoonraker() ? 'Klipper' : 'OctoPrint'
     },
-    basicStreamingInWebrtc: function () {
+    isAgentVersionGte: function (minOctoPrintAgentVersion, minMoonrakerAgentVersion) {
       return (
         (get(this, 'settings.agent_name', '') === 'octoprint_obico' &&
-          semverGte(get(this, 'settings.agent_version', '0.0.0'), '2.1.0')) ||
+          semverGte(get(this, 'settings.agent_version', '0.0.0'), minOctoPrintAgentVersion)) ||
         (get(this, 'settings.agent_name', '') === 'moonraker_obico' &&
-          semverGte(get(this, 'settings.agent_version', '0.0.0'), '0.3.0'))
+          semverGte(get(this, 'settings.agent_version', '0.0.0'), minMoonrakerAgentVersion))
       )
     },
     alertUnacknowledged: function () {
@@ -156,28 +244,10 @@ export const normalizedPrinter = (newData, oldData) => {
     },
     // Printing availability
     isPrintable: function () {
-      return !this.isOffline() && !this.isDisconnected() && !this.isActive()
+      return !this.isOffline() && !this.isDisconnected() && !this.isActive() && !this.archived_at
     },
     printabilityText: function () {
       return this.isPrintable() ? 'Ready' : 'Unavailable'
-    },
-    // Storage availability
-    browsabilityMinPluginVersion: function () {
-      const MIN_OCTOPRINT_PLUGIN_VERSION = '2.3.0'
-      const MIN_MOONRAKER_PLUGIN_VERSION = '1.2.0'
-      return this.isAgentMoonraker() ? MIN_MOONRAKER_PLUGIN_VERSION : MIN_OCTOPRINT_PLUGIN_VERSION
-    },
-    isBrowsable: function () {
-      return !(
-        this.isOffline() ||
-        !semverGte(
-          get(this, 'settings.agent_version', '0.0.0'),
-          this.browsabilityMinPluginVersion()
-        )
-      )
-    },
-    browsabilityText: function () {
-      return this.isBrowsable() ? 'Available to browse files' : 'Unable to browse files'
     },
   }
   if (oldData) {

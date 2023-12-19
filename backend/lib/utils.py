@@ -2,7 +2,6 @@
 import json
 from django.conf import settings
 import subprocess
-import tempfile
 import os
 import io
 import re
@@ -35,21 +34,22 @@ def ml_api_auth_headers():
 
 def orientation_to_ffmpeg_options(printer_settings):
     options = '-vf pad=ceil(iw/2)*2:ceil(ih/2)*2'
-    orientation = (printer_settings['webcam_flipV'], printer_settings['webcam_flipH'], printer_settings['webcam_rotate90'])
-    if orientation == (False, False, True):
-        options += ',transpose=2'
-    elif orientation == (False, True, False):
-        options += ',hflip'
-    elif orientation == (False, True, True):
-        options += ',transpose=0'
-    elif orientation == (True, False, False):
-        options += ',vflip'
-    elif orientation == (True, False, True):
-        options += ',transpose=3'
-    elif orientation == (True, True, True):
+
+    rotation = printer_settings['webcam_rotation']
+    flip = (printer_settings['webcam_flipV'], printer_settings['webcam_flipH'])
+
+    if rotation == 90:
         options += ',transpose=1'
-    elif orientation == (True, True, False):
-        options += ',hflip,vflip'
+    elif rotation == 270:
+        options += ',transpose=2'
+    elif rotation == 180:
+        options += ',transpose=1,transpose=1'
+
+    if printer_settings['webcam_flipV']:
+        options += ',vflip'
+
+    if printer_settings['webcam_flipH']:
+        options += ',hflip'
 
     return options
 
@@ -97,8 +97,8 @@ def save_pic(dest_jpg_path, img_bytes, rotated=False, printer_settings=None, to_
             tmp_img = tmp_img.transpose(Image.FLIP_LEFT_RIGHT)
         if printer_settings['webcam_flipV']:
             tmp_img = tmp_img.transpose(Image.FLIP_TOP_BOTTOM)
-        if printer_settings['webcam_rotate90']:
-            tmp_img = tmp_img.transpose(Image.ROTATE_90)
+        if printer_settings['webcam_rotation'] and printer_settings['webcam_rotation'] != 0:
+            tmp_img = tmp_img.rotate(-printer_settings['webcam_rotation'], expand=True)
 
         bytes_to_save = io.BytesIO()
         tmp_img.save(bytes_to_save, "JPEG")
@@ -114,7 +114,8 @@ def get_rotated_pic_url(printer, jpg_url=None, force_snapshot=False):
             return None
         jpg_url = printer.pic.get('img_url')
 
-    need_rotation = printer.settings['webcam_flipV'] or printer.settings['webcam_flipH'] or printer.settings['webcam_rotate90']
+    need_rotation = printer.settings['webcam_flipV'] or printer.settings['webcam_flipH'] \
+        or (printer.settings['webcam_rotation'] and printer.settings['webcam_rotation'] != 0)
 
     if not need_rotation and not force_snapshot:
         return jpg_url
@@ -128,3 +129,26 @@ def get_rotated_pic_url(printer, jpg_url=None, force_snapshot=False):
                 printer_settings=printer.settings,
                 to_long_term_storage=False
             )
+
+
+# https://stackoverflow.com/questions/3173320/text-progress-bar-in-terminal-with-block-characters
+def printProgressBar(iteration, total, prefix='Progress:', suffix='Complete', decimals=1, length=50, fill='X', printEnd=""):
+    """
+    Call in a loop to create terminal progress bar
+    @params:
+        iteration   - Required  : current iteration (Int)
+        total       - Required  : total iterations (Int)
+        prefix      - Optional  : prefix string (Str)
+        suffix      - Optional  : suffix string (Str)
+        decimals    - Optional  : positive number of decimals in percent complete (Int)
+        length      - Optional  : character length of bar (Int)
+        fill        - Optional  : bar fill character (Str)
+        printEnd    - Optional  : end character (e.g. "\r", "\r\n") (Str)
+    """
+    percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
+    filledLength = int(length * iteration // total)
+    bar = fill * filledLength + '-' * (length - filledLength)
+    print(f'\r{prefix} |{bar}| {percent}% {suffix}', end=printEnd, flush=True)
+    # Print New Line on Complete
+    if iteration == total:
+        print()

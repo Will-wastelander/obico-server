@@ -22,7 +22,7 @@
             <hr />
             <br /><br />
             <p class="text-center">
-              Obico let you monitor and control your printer from anywhere, on your phone.
+              Obico lets you monitor and control your printer from anywhere, on your phone.
             </p>
             <a class="btn btn-block btn-primary" href="/accounts/signup/"
               >Sign up for a free Obico account</a
@@ -38,7 +38,7 @@
 import split from 'lodash/split'
 import { normalizedPrinter } from '@src/lib/normalizers'
 import urls from '@config/server-urls'
-import PrinterComm from '@src/lib/printer_comm'
+import { printerCommManager } from '@src/lib/printer-comm'
 import WebRTCConnection from '@src/lib/webrtc'
 import StreamingBox from '@src/components/StreamingBox'
 import NavBar from '@src/components/NavBar.vue'
@@ -54,21 +54,28 @@ export default {
       shareToken: null,
       videoAvailable: {},
       loading: true,
+      isWebrtcOpened: false,
       webrtc: WebRTCConnection(),
     }
   },
   created() {
     this.shareToken = split(window.location.pathname, '/').slice(-2, -1).pop()
-    this.printerComm = PrinterComm(
+    this.printerComm = printerCommManager.getOrCreatePrinterComm(
       this.shareToken,
       urls.printerSharedWebSocket(this.shareToken),
-      (data) => {
-        this.printer = normalizedPrinter(data, this.printer)
-        this.loading = false
+      {
+        onPrinterUpdateReceived: (data) => {
+          this.printer = normalizedPrinter(data, this.printer)
+          this.loading = false
+
+          if (!this.isWebrtcOpened) {
+            this.webrtc.openForShareToken(this.shareToken)
+            this.isWebrtcOpened = true
+          }
+        },
       }
     )
     this.printerComm.connect()
-    this.webrtc.openForShareToken(this.shareToken)
   },
 }
 </script>

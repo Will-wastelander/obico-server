@@ -40,10 +40,7 @@ export default {
         this.authorizedApps = response.data
       })
       .catch((error) => {
-        this.$swal.Reject.fire({
-          title: 'Oops',
-          text: error.message,
-        })
+        this.errorDialog(error, 'Failed to fetch authorized apps')
       })
   },
 
@@ -55,10 +52,7 @@ export default {
           this.authorizedApps = this.authorizedApps.filter((app) => app.id !== id)
         })
         .catch((error) => {
-          this.$swal.Reject.fire({
-            title: 'Oops',
-            text: error.message,
-          })
+          this.errorDialog(error, 'Failed to remove access')
         })
     },
   },

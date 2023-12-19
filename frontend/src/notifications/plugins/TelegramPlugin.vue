@@ -69,7 +69,7 @@ import NotificationChannelTemplate from '@src/components/user-preferences/notifi
 import axios from 'axios'
 import urls from '@config/server-urls'
 import { vueTelegramLogin } from 'vue-telegram-login'
-import { mobilePlatform } from '@src/lib/page_context'
+import { mobilePlatform } from '@src/lib/page-context'
 
 export default {
   name: 'TelegramPlugin',
@@ -106,6 +106,7 @@ export default {
       return mobilePlatform()
     },
   },
+
   methods: {
     onTelegramAuth(telegram_user) {
       const config = { chat_id: JSON.stringify(telegram_user.id) }
@@ -126,8 +127,15 @@ export default {
         })
         .catch((err) => {
           event.target.classList.remove('disabled')
-          this.$emit('errorAlert', 'Telegram test failed.')
-          console.log(err)
+          this.$swal.Reject.fire({
+            title: 'Error',
+            html: `<p style="line-height: 1.5; max-width: 400px; margin: 0 auto;">
+              Telegram test failed
+            </p>`,
+            showConfirmButton: false,
+            showCancelButton: true,
+            cancelButtonText: 'Close',
+          })
         })
     },
   },

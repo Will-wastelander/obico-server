@@ -3,7 +3,15 @@ title: Configure Obico to work with a reverse proxy
 ---
 
 :::danger
-**Security Warning**: The guide below only cover the basic steps to set up a reverse proxy for self-hosted Obico Server. The setup required to properly secure your reverse proxy is too complicated to be covered here. Please do your own research to gather the necessary info before you proceed.
+**Security Warning**: The guide below only cover the basic steps to set up a reverse proxy for self-hosted Obico Server. The setup required to properly secure your private network is too complicated to be covered here. Please do your own research to gather the necessary info before you proceed.
+:::
+
+:::note
+This is a community-contributed guide. This guide is based on certain Obico community members' own setup and hence may not work for you.
+:::
+
+:::tip
+Some Obico community members have found it easier to set up NGINX reverse proxy using NGINX Proxy Manager. You can try your luck by following [this community-contributed guide](nginx-proxy-manager.md).
 :::
 
 You can set up a reverse proxy in front of your self-hosted Obico Server.
@@ -34,7 +42,7 @@ The "Domain name" needs to be set to `reverse_proxy_ip:reverse_proxy_port`. The 
 
 ## NGINX {#nginx}
 
-For webcam feed to work, remember to activate Websockets support. Otherwise there will no webfeed when accessing through proxy.
+For webcam feed to work, remember to activate Websockets Support. Otherwise there will no webfeed when accessing through proxy.
 
 ![NginxProxyManagerSettings](/img/server-guides/nginxsettings.png)
 
@@ -99,7 +107,7 @@ server {
 
 1. Add `labels:` and `networks:` to the `web:` section, and also add `networks:` at the end of the file:
 
-    ```
+    ```yaml
     ...
       web:
         <<: *web-defaults
@@ -126,6 +134,6 @@ server {
             external: true
       ```
 
-1. Retart the Obico Server with `docker compose restart`
+1. Restart the Obico Server with `docker compose restart`
 
 1. You should now be able to browse to `spaghetti.your.domain`

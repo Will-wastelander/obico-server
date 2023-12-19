@@ -89,7 +89,7 @@ An `Map` object. The `key` of the map is the name of the heater, such as "tool0"
 - `webcam_flipV`: `true` if the webcam is flipped vertically. Otherwise `false`.
 - `webcam_flipH`: `true` if the webcam is flipped horizontally. Otherwise `false`.
 - `webcam_streamRatio`: Webcam aspect ratio. Currently only	"4:3" and "16:9" are supported.
-- `webcam_rotate90`: `true` if the webcam is rotated 90 degrees clock-wise. Otherwise `false`.
+- `webcam_rotation`: `0` webcam rotation degree (clockwise). Possible values: [`0`, `90`, `180`, `270`].
 - `agent_name`: The "agent" that connects to the server to represents the printer. Currently it can be either `octoprint_obico` or `moonraker_obico`.
 - `agent_version`: The version of the agent.
 - `temp_profiles`: An `List` of `Map` objects. The `key` of the map is the name of the heater, such as "chamber", "bed". The `value` of the map is the preset temperature.
@@ -116,7 +116,7 @@ A dummy print object will be created when a timelapse video is uploaded to the s
 - `alerted_at`: The timestamp when a possible print failure is detected and alerted. Null if nothing is detected during the print. If multiple print failures are detected and alerted, only the last one is saved in this field. In ISO-8601 format.
 - `alert_acknowledged_at`: The timestamp when the user comes to the app to respond to the failure alert. Null if the user never responds. If multiple print failures are detected and the user responds multiple times, only the last one is saved in this field. In ISO-8601 format.
 - `alert_muted_at`: The timestamp when the user indicates the alert as a false, and tells the server to stop detection for the rest of the print. In ISO-8601 format.
-- `paused_at`: The timestamp when the print is paused, either because of a detected print failure, or because the user manually pauses it. If the print is paused (and resumed) multiple times before it ends, only the last one is saved in this field. In ISO-8601 format.
+- `paused_at`: The timestamp when the print is paused because of a detected print failure. If the print is paused (and resumed) multiple times before it ends, only the last one is saved in this field. In ISO-8601 format. Note: This field is not set if the user manually pauses the print.
 - `video_url`: The URL for the timelapse video.
 - `tagged_video_url`: The URL for the "tagged" timelapse video, i.e., the video with potential detected failures indicated in green boxes.
 - `poster_url`: The URL for the "poster" of the video, i.e., the image a video player shows before the video starts playing.

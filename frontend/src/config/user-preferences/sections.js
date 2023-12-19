@@ -1,8 +1,15 @@
 import routes from '@config/user-preferences/routes'
 import notificationPlugins from '@src/notifications/plugins'
-import { inMobileWebView, onlyNotifications } from '@src/lib/page_context'
+import { inMobileWebView, onlyNotifications } from '@src/lib/page-context'
 
 const defaultSections = {
+  GeneralPreferences: {
+    title: 'General',
+    faIcon: 'fas fa-cog',
+    importComponent: () => import('@src/components/user-preferences/GeneralPreferences'),
+    route: routes.GeneralPreferences,
+    isHidden: inMobileWebView() || onlyNotifications(),
+  },
   ThemePreferences: {
     title: 'Appearance',
     faIcon: 'fas fa-magic',

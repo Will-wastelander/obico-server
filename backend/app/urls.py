@@ -9,12 +9,14 @@ from .views import tunnelv2_views
 urlpatterns = [
     path('', web_views.index, name='index'),
     path('accounts/login/', web_views.SocialAccountAwareLoginView.as_view(), name="account_login"),
+    path('accounts/signup/', web_views.SocialAccountAwareSignupView.as_view(), name="account_signup"),
     path('media/<path:file_path>', web_views.serve_jpg_file),  # semi hacky solution to serve image files
     path('printers/', web_views.printers, name='printers'),
     re_path('printers/wizard/(?P<route>([^/]+/)*)$', web_views.new_printer),
     path('printers/<int:pk>/', web_views.edit_printer),
     path('printers/<int:pk>/delete/', web_views.delete_printer),
     path('printers/<int:pk>/control/', web_views.printer_control),
+    path('printers/<int:pk>/terminal/', web_views.printer_terminal),
     path('printers/share_token/<share_token>/', web_views.printer_shared, name='printer_shared'),
     re_path('^user_preferences/(?P<route>([^/]+/)*)$', web_views.user_preferences),
     path('unsubscribe_email/', web_views.unsubscribe_email),
@@ -27,6 +29,7 @@ urlpatterns = [
     path('prints/upload/', web_views.upload_print),
     # TODO: Change this to `/prints/` for consistency when mobile app get rid of legacy Prints (Time-Lapses) webview:
     path('print_history/', web_views.print_history, name='print_history'),
+    path('stats/', web_views.stats, name='stats'),
 
     path('prints/<int:pk>/', web_views.print),
     path('prints/shot-feedback/<pk>/', web_views.print_shot_feedback),

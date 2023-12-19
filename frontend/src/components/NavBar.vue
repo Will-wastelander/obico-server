@@ -10,7 +10,10 @@
     >
       <b-container class="p-0">
         <b-navbar-brand href="/">
-          <svg width="100" height="30">
+          <div v-if="$brand">
+            <img :src="`/static/img/branding/${$brand}/logo-full.png`" width="100" alt="Logo" />
+          </div>
+          <svg v-else width="100" height="30">
             <use href="#svg-logo-full" />
           </svg>
         </b-navbar-brand>
@@ -25,19 +28,19 @@
               v-if="user"
               href="/printers/"
               :class="{ active: viewName.includes('printers') }"
-              >Printer</b-nav-item
+              >Printers</b-nav-item
             >
             <b-nav-item
               v-if="user"
               href="/print_history/"
               :class="{ active: viewName.includes('print_history') }"
-              >Time-lapse</b-nav-item
+              >Print History</b-nav-item
             >
             <b-nav-item
               v-if="user"
               href="/g_code_folders/cloud/"
               :class="{ active: viewName.includes('g_code_folders') }"
-              >G-Code</b-nav-item
+              >G-Codes</b-nav-item
             >
             <b-nav-item
               v-if="isEnt && !user"
@@ -82,7 +85,7 @@
 </template>
 
 <script>
-import { inMobileWebView, user, settings } from '@src/lib/page_context'
+import { inMobileWebView, user, settings } from '@src/lib/page-context'
 import { Themes } from '@static/js/color-scheme'
 import { currentThemeValue } from '@src/lib/color-scheme-controller'
 

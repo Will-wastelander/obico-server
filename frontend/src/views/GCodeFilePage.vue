@@ -13,16 +13,53 @@
       </a>
     </template>
     <template #topBarRight>
-      <div>
-        <b-dropdown v-if="isCloud" right no-caret toggle-class="icon-btn">
+      <div class="action-panel">
+        <!-- Rename -->
+        <a
+          v-if="isCloud"
+          href="#"
+          class="btn shadow-none icon-btn action-btn"
+          title="Rename file"
+          @click.prevent="renameFile"
+        >
+          <i class="fas fa-edit"></i>
+        </a>
+        <!-- Delete -->
+        <a
+          v-if="isCloud"
+          href="#"
+          class="text-danger btn shadow-none icon-btn action-btn"
+          title="Delete file"
+          @click.prevent="deleteFile"
+        >
+          <i class="fas fa-trash-alt"></i>
+        </a>
+        <!-- Mobile Menu -->
+        <b-dropdown right no-caret toggle-class="icon-btn d-md-none">
           <template #button-content>
             <i class="fas fa-ellipsis-v"></i>
           </template>
-          <b-dropdown-item @click="renameFile"> <i class="fas fa-edit"></i>Rename </b-dropdown-item>
-          <b-dropdown-item @click="deleteFile">
-            <span class="text-danger"> <i class="fas fa-trash-alt"></i>Delete </span>
-          </b-dropdown-item>
+          <cascaded-dropdown
+            ref="cascadedDropdown"
+            :menu-options="[
+              {
+                key: 'renameFile',
+                icon: 'fas fa-edit',
+                title: `Rename file`,
+                callback: true,
+              },
+              {
+                key: 'deleteFile',
+                icon: 'fas fa-trash-alt',
+                customMenuOptionClass: 'text-danger',
+                title: `Delete file`,
+                callback: true,
+              },
+            ]"
+            @menuOptionClicked="onMenuOptionClicked"
+          />
         </b-dropdown>
+
         <a
           v-if="onClose"
           href="#"
@@ -49,49 +86,19 @@
           </b-col>
         </b-row>
       </b-container>
-      <b-container v-else fluid="xl">
+      <b-container v-else fluid>
         <b-row>
-          <b-col>
-            <!-- File info -->
-            <div class="card-container file-info" :class="{ 'full-width': isPopup }">
-              <b-container fluid>
-                <b-row>
-                  <b-col>
-                    <h1 class="file-name overflow-truncated">
-                      {{ gcode.filename }}
-                    </h1>
-                  </b-col>
-                </b-row>
-                <b-row>
-                  <b-col :sm="isCloud ? 6 : 12">
-                    <div class="file-info-line">
-                      <div><i class="fas fa-history"></i>Uploaded</div>
-                      <div class="value">{{ gcode.created_at.fromNow() }}</div>
-                    </div>
-                    <div class="file-info-line">
-                      <div><i class="far fa-file-code"></i>File size</div>
-                      <div class="value">{{ gcode.filesize }}</div>
-                    </div>
-                  </b-col>
-                  <b-col v-show="isCloud" sm="6">
-                    <div class="file-info-line">
-                      <div><i class="fas fa-circle"></i>Times printed</div>
-                      <div class="value">{{ gcode.totalPrints }}</div>
-                    </div>
-                    <div class="file-info-line">
-                      <div><i class="fas fa-circle text-success"></i>Succeeded</div>
-                      <div class="value">{{ gcode.successPrints }}/{{ gcode.totalPrints }}</div>
-                    </div>
-                    <div class="file-info-line">
-                      <div><i class="fas fa-circle text-danger"></i>Failed or cancelled</div>
-                      <div class="value">{{ gcode.failedPrints }}/{{ gcode.totalPrints }}</div>
-                    </div>
-                  </b-col>
-                </b-row>
-              </b-container>
-            </div>
+          <b-col :lg="isPopup ? 12 : 5">
+            <b-alert :show="isDeleted" variant="warning warning-block">
+              This file is deleted and unavailable for print
+            </b-alert>
+
+            <!-- File details -->
+            <g-code-details :file="gcode" :show-print-stats="true" :compact-view="false" />
+
             <!-- Available printers -->
             <available-printers
+              v-if="!isDeleted"
               class="card-container available-printers"
               :class="{ 'full-width': isPopup }"
               :is-popup="isPopup"
@@ -100,9 +107,11 @@
               :is-cloud="isCloud"
               @refresh="onRefresh"
             />
+          </b-col>
+          <b-col :lg="isPopup ? 12 : 7">
             <!-- Print history -->
-            <div class="print-history" :class="{ 'full-width': isPopup }">
-              <h2 class="section-title">Print history</h2>
+            <div class="print-history" :class="{ 'full-width': isPopup || isDeleted }">
+              <h2 class="section-title mb-3">Print History</h2>
               <div v-if="gcode.print_set.length">
                 <print-history-item
                   v-for="print of gcode.print_set"
@@ -132,16 +141,22 @@
 
 <script>
 import PageLayout from '@src/components/PageLayout.vue'
+import filter from 'lodash/filter'
 import get from 'lodash/get'
 import urls from '@config/server-urls'
 import axios from 'axios'
-import { normalizedGcode } from '@src/lib/normalizers'
+import { normalizedGcode, normalizedPrinter } from '@src/lib/normalizers'
 import RenameModal from '@src/components/g-codes/RenameModal.vue'
 import DeleteConfirmationModal from '@src/components/g-codes/DeleteConfirmationModal.vue'
 import availablePrinters from '@src/components/g-codes/AvailablePrinters.vue'
-import PrinterComm from '@src/lib/printer_comm'
-import { listFiles } from '@src/components/g-codes/localFiles'
+import { printerCommManager } from '@src/lib/printer-comm'
+import {
+  listPrinterLocalGCodesMoonraker,
+  listPrinterLocalGCodesOctoPrint,
+} from '@src/lib/printer-local-comm'
 import PrintHistoryItem from '@src/components/prints/PrintHistoryItem.vue'
+import CascadedDropdown from '@src/components/CascadedDropdown'
+import GCodeDetails from '@src/components/GCodeDetails.vue'
 
 export default {
   name: 'GCodeFilePage',
@@ -152,6 +167,8 @@ export default {
     DeleteConfirmationModal,
     availablePrinters,
     PrintHistoryItem,
+    CascadedDropdown,
+    GCodeDetails,
   },
 
   props: {
@@ -181,6 +198,7 @@ export default {
   data() {
     return {
       gcode: null,
+      printer: null,
       loading: true,
       gcodeNotFound: false,
     }
@@ -190,20 +208,43 @@ export default {
     isCloud() {
       return !this.selectedPrinterId
     },
+    isDeleted() {
+      return !!this.gcode?.deleted
+    },
   },
 
-  created() {
+  async created() {
     this.selectedPrinterId = Number(this.getRouteParam('printerId')) || null
+    if (this.selectedPrinterId) {
+      await this.fetchPrinter()
+    }
     this.gcodeId = this.getRouteParam('fileId')
     this.fetchGcode()
   },
 
   methods: {
+    onMenuOptionClicked(menuOptionKey) {
+      if (menuOptionKey === 'renameFile') {
+        this.renameFile()
+      } else if (menuOptionKey === 'deleteFile') {
+        this.deleteFile()
+      }
+    },
     getRouteParam(name) {
       return this.isPopup ? this.routeParams[name] : this.$route.params[name]
     },
     goBack() {
       this.$emit('goBack')
+    },
+    async fetchPrinter() {
+      return axios
+        .get(urls.printer(this.selectedPrinterId))
+        .then((response) => {
+          this.printer = normalizedPrinter(response.data)
+        })
+        .catch((error) => {
+          this.errorDialog(error, 'Host printer for this gcode not found')
+        })
     },
     async fetchLocalFile() {
       if (!this.printerComm) {
@@ -213,57 +254,60 @@ export default {
 
       const decodedPath = decodeURIComponent(this.gcodeId)
       const filename = decodedPath.split('/').at(-1)
-      const path =
+      const dir_path =
         filename === decodedPath
           ? ''
           : decodedPath.slice(0, decodedPath.length - filename.length - 1)
 
-      listFiles(this.printerComm, {
-        query: filename,
-        path,
-        onRequestEnd: async (result) => {
+      const getPrinterLocalGCode = this.printer.isAgentMoonraker()
+        ? listPrinterLocalGCodesMoonraker
+        : listPrinterLocalGCodesOctoPrint
+
+      getPrinterLocalGCode(this.printerComm, dir_path, null)
+        .then((result) => {
+          return { files: filter(get(result, 'files', []), (f) => f.filename == filename) }
+        })
+        .then(async (result) => {
           this.loading = false
-          if (result?.files?.length) {
-            const file = result.files.find((f) => f.path === decodedPath)
-            if (!file) {
-              this.gcodeNotFound = true
-              return
-            }
-            this.gcode = {
-              ...file,
-              print_set: [],
-            }
-            if (file.path && file.hash && this.getRouteParam('printerId')) {
-              const safeFilename = file.path.replace(/^.*[\\/]/, '')
-              try {
-                let response = await axios.get(
-                  urls.gcodeFiles({
-                    resident_printer: this.getRouteParam('printerId'),
-                    safe_filename: safeFilename,
-                    agent_signature: `md5:${file.hash}`,
-                  })
-                )
-                const gcodeFileOnServer = get(response, 'data.results[0]')
-                if (gcodeFileOnServer) {
-                  this.gcode = normalizedGcode(gcodeFileOnServer)
-                }
-              } catch (e) {
-                console.error(e)
-              }
-            }
-          } else {
+          if (result?.files?.length === 0) {
             this.gcodeNotFound = true
+            return
           }
-        },
-      })
+
+          const file = result?.files[0]
+          this.gcode = {
+            ...normalizedGcode(file),
+            print_set: [],
+          }
+          if (file.path && file.hash && this.getRouteParam('printerId')) {
+            const safeFilename = file.path.replace(/^.*[\\/]/, '')
+            try {
+              let response = await axios.get(urls.gcodeFiles(), {
+                params: {
+                  resident_printer: this.getRouteParam('printerId'),
+                  safe_filename: safeFilename,
+                  agent_signature: `md5:${file.hash}`,
+                },
+              })
+              const gcodeFileOnServer = get(response, 'data.results[0]')
+              if (gcodeFileOnServer) {
+                const cloudCopy = normalizedGcode(gcodeFileOnServer)
+                this.gcode.print_set = cloudCopy.print_set
+              }
+            } catch (e) {
+              console.error(e)
+            }
+          }
+        })
+        .catch((err) => {
+          this.gcodeNotFound = true
+        })
     },
     async fetchGcode() {
       if (this.selectedPrinterId) {
-        this.printerComm = PrinterComm(
+        this.printerComm = printerCommManager.getOrCreatePrinterComm(
           this.selectedPrinterId,
-          urls.printerWebSocket(this.selectedPrinterId),
-          (data) => {},
-          (printerStatus) => {}
+          urls.printerWebSocket(this.selectedPrinterId)
         )
         this.printerComm.connect(this.fetchLocalFile)
         return
@@ -314,26 +358,19 @@ export default {
 </script>
 
 <style lang="sass" scoped>
-.file-info, .print-history
-  width: 60%
-  display: inline-block
-  &.print-history
-    padding-top: 10px
-    margin-top: 30px
+.warning-block
+  margin-bottom: var(--gap-between-blocks)
 
 .available-printers
-  width: calc(40% - 30px)
-  float: right
-
-.file-info, .print-history, .available-printers
+  margin-top: var(--gap-between-blocks)
   &.full-width
-    width: 100%
-    &.print-history, &.available-printers
-      margin-top: 15px
-  @media (max-width: 996px)
-    width: 100%
-    &.print-history, &.available-printers
-      margin-top: 15px
+    margin-top: 15px
+
+.print-history
+  &.full-width
+    margin-top: 30px
+  @media (max-width: 991px)
+    margin-top: 30px
 
 .file-name
   font-size: 1.25rem

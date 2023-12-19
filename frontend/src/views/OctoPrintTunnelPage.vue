@@ -16,9 +16,9 @@
         </div>
         <div :class="usageClass">Used {{ usageMTD }} of {{ humanizedUsageCap }}.</div>
         <div v-if="overage">
-          Your month-to-date tunneling usage is over the Free plan limit.
+          Your month-to-date tunnel data usage is over the Free plan limit.
           <a type="button" class="btn btn-sm btn-primary" href="/ent_pub/pricing/"
-            >Get Unlimited Tunneling</a
+            >Get Unlimited Tunnel Data</a
           >
         </div>
       </div>
@@ -44,7 +44,7 @@ import moment from 'moment'
 import split from 'lodash/split'
 import filesize from 'filesize'
 import urls from '@config/server-urls'
-import { user } from '@src/lib/page_context'
+import { user } from '@src/lib/page-context'
 import { isLocalStorageSupported } from '@static/js/utils'
 
 export default {
@@ -105,16 +105,16 @@ export default {
           html: `
           <h4 class="text-center p-2">
             <svg class="menu-icon" style="height: 1.1em; width: 1em; margin-right: 0.75em;">
-              <use href="#svg-octoprint-tunneling" />
+              <use href="#svg-tunnel" />
             </svg>
-            OctoPrint Secure Tunnel
+            OctoPrint/Klipper Secure Tunnel
           </h4>
           <div class="p-1">
-            It may take long time for OctoPrint page to load as it is securely tunneled via the Obico app server.
+            It may take long time for OctoPrint/Mainsail/Fluidd page to load as it is securely tunneled via the Obico app server.
           </div>
           <div class="p-1">
             <a target="_blank" href="https://www.obico.io/docs/user-guides/octoprint-tunneling/#is-octoprint-tunneling-free-to-all-users">
-            Learn more about OctoPrint Tunneling's security and page load speed.
+            Learn more about OctoPrint/Klipper tunnel's security and page load speed.
             <i class="fas fa-external-link-alt"></i>
           </a>
         </div>

@@ -24,7 +24,7 @@ When passed an image URL, the server:
    2. evaluates the model via GPU
    3. filters the results (including via [non-max suppression](https://learnopencv.com/non-maximum-suppression-theory-and-implementation-in-pytorch/) and probability thresholds)
    4. returns one or more bounding boxes which are likely to contain spaghetti
-2. Formats the results so that they are easily parseable by the web server, and returns them as a JSON array of `[{category_name, detection_probability, bounding_box}]`. There's currently only one category of "failure", i.e. failure/spaghetti detected.
+2. Formats the results so that they are easily parsable by the web server, and returns them as a JSON array of `[{category_name, detection_probability, bounding_box}]`. There's currently only one category of "failure", i.e. failure/spaghetti detected.
 
 ## Building and running `ml_api` locally
 
@@ -170,4 +170,3 @@ services:
 Segfaults can happen when there is a mismatch in the compiled darknet shared library and the python code attempting to run it. You may not get a lot of detail if you're running a python script and the segfault happens in C code - in this case, prepending your shell command with `PYTHONFAULTHANDLER=1` can increase the amount of information you get back (details [here](https://docs.python.org/3/library/faulthandler.html)).
 
 If the segfault appears to be about trying to invoke a method that the `*.so` file doesn't have, you can run `nm -D bin/model_aarch64.so` to see inside the binary and confirm whether or not this is actually the case.
-

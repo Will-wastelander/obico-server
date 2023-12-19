@@ -4,7 +4,8 @@
       <b-container>
         <b-row class="justify-content-center">
           <b-col lg="8">
-            <div v-if="printer" class="surface with-loading-animation full-on-mobile">
+            <loading-placeholder v-if="!printer" />
+            <div v-else class="surface with-loading-animation full-on-mobile">
               <section class="settings">
                 <h2 class="section-title">Settings</h2>
                 <div class="form-group mb-4 mt-4">
@@ -309,7 +310,7 @@
                     >
                   </div>
                 </div>
-                <div class="mt-4">
+                <div v-if="isEnt" class="mt-4">
                   <button class="btn btn-outline-warning" @click="archivePrinter">
                     Archive Printer
                   </button>
@@ -331,9 +332,6 @@
                   </div>
                 </div>
               </section>
-            </div>
-            <div v-else class="text-center">
-              <b-spinner class="mt-5" label="Loading..."></b-spinner>
             </div>
           </b-col>
         </b-row>
@@ -359,6 +357,7 @@ import urls from '@config/server-urls'
 import SavingAnimation from '@src/components/SavingAnimation.vue'
 import NumberInput from '@src/components/NumberInput.vue'
 import PageLayout from '@src/components/PageLayout.vue'
+import { settings } from '@src/lib/page-context'
 
 export default {
   components: {
@@ -370,6 +369,7 @@ export default {
 
   data() {
     return {
+      isEnt: false,
       printer: null,
       printerId: '',
       saving: {},
@@ -542,6 +542,8 @@ export default {
   },
 
   created() {
+    const { IS_ENT } = settings()
+    this.isEnt = !!IS_ENT
     this.printerId = split(window.location.pathname, '/').slice(-2, -1).pop()
     this.fetchPrinter()
   },
@@ -551,9 +553,14 @@ export default {
      * Get actual printer settings
      */
     fetchPrinter() {
-      return axios.get(urls.printer(this.printerId)).then((response) => {
-        this.printer = normalizedPrinter(response.data, this.printer)
-      })
+      return axios
+        .get(urls.printer(this.printerId))
+        .then((response) => {
+          this.printer = normalizedPrinter(response.data, this.printer)
+        })
+        .catch((error) => {
+          this.errorDialog(error, 'Printer not found')
+        })
     },
 
     /**
@@ -595,7 +602,7 @@ export default {
     errorAlert() {
       this.$swal.Toast.fire({
         icon: 'error',
-        html: '<div>Can not update printer settings.</div><div>Get help from <a href="https://obico.io/discord">the Obico app discussion forum</a> if this error persists.</div>',
+        html: '<div>Can not update printer settings.</div><div>Get help from <a href="https://obico.io/discord">the Obico general support forum</a> or <a href="https://obico.io/discord">Obico for klipper support forum</a> if this error persists.</div>',
       })
     },
 
