@@ -1,12 +1,13 @@
 #/usr/bin/bash
 set -e
 
+BACKUP_DIR=backup # Set this to the dir you want to use for backups.
+
+##### Do not edit unless you know what you are doing #####
+
 export OBICO_DIR=$(readlink -f $(dirname "$0"))
 
 OBICO=${OBICO_DIR}
-BACKUP_DIR=backup
-
-##### Do not edit unless you know what you are doing #####
 
 NOW=$(date "+%m.%d.%Y-%H.%M.%S")
 
