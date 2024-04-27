@@ -3,13 +3,12 @@ set -e
 
 export OBICO_DIR=$(readlink -f $(dirname "$0"))
 
-#OBICO=~/obico-server
 OBICO=${OBICO_DIR}
 BACKUP_DIR=backup
 
 ##### Do not edit unless you know what you are doing #####
 
-NOW="$(date +"%m-%d-%Y")"
+NOW=$(date "+%m.%d.%Y-%H.%M.%S")
 
 if [ ! -d ${OBICO}/${BACKUP_DIR} ]
 then
